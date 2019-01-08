@@ -166,12 +166,15 @@ export default class RootMotionTest extends Test {
                     actor.value.startAnimation('animmove', true);
                     if (stateCounter !== 0) {
                         actor.value.stopAnimation('animscale');
+                        actor.value.resetAnimation('animscale');
                     }
                 } else if ((stateCounter % 3) === 1) {
                     actor.value.stopAnimation('animmove');
+                    actor.value.resetAnimation('animmove');
                     actor.value.startAnimation('animturn', true);
                 } else if ((stateCounter % 3) === 2) {
                     actor.value.stopAnimation('animturn');
+                    actor.value.resetAnimation('animturn');
                     actor.value.startAnimation('animscale', true);
                 }
                 stateCounter++;
