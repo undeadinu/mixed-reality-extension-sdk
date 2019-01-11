@@ -140,6 +140,12 @@
         "clear": true
       },
       "problemMatcher": []
+    },
+    {
+      "type": "npm",
+      "script": "clean",
+      "path": "packages/sdk/",
+      "problemMatcher": []
     }
   ]
 }

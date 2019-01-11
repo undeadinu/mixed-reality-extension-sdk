@@ -10,15 +10,14 @@ import ClockSyncTest from './tests/clock-sync-test';
 import GltfAnimationTest from './tests/gltf-animation-test';
 import GltfGenTest from './tests/gltf-gen-test';
 import InputTest from './tests/input-test';
+import InterpolationTest from './tests/interpolation-test';
 import LibraryTest from './tests/library-test';
 import LookAtTest from './tests/look-at-test';
 import PrimitivesTest from './tests/primitives-test';
 import RigidBodyTest from './tests/rigid-body-test';
-import RootMotionTest from './tests/root-motion-test';
 import Test from './tests/test';
 import TextTest from './tests/text-test';
 import UserTest from './tests/user-test';
-import delay from './utils/delay';
 import destroyActors from './utils/destroyActors';
 
 /**
@@ -47,8 +46,8 @@ export default class App {
         'primitives-test': (): Test => new PrimitivesTest(this, this.baseUrl),
         'input-test': (): Test => new InputTest(this, this.baseUrl),
         'gltf-gen-test': (): Test => new GltfGenTest(this, this.baseUrl),
-        'root-motion-test': (): Test => new RootMotionTest(this, this.baseUrl),
-        'asset-preload-test': (): Test => new AssetPreloadTest(this, this.baseUrl)
+        'asset-preload-test': (): Test => new AssetPreloadTest(this, this.baseUrl),
+        'interpolation-test': (): Test => new InterpolationTest(this),
     };
 
     constructor(private _context: MRESDK.Context, private params: MRESDK.ParameterSet, private baseUrl: string) {

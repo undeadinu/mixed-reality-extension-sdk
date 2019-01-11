@@ -15,15 +15,15 @@ import {
     Text,
     TextLike,
     Transform,
-    TransformLike } from '.';
+    TransformLike
+} from '.';
 import {
-    AnimationEvent,
-    AnimationKeyframe,
-    AnimationWrapMode,
     Context,
+    CreateAnimationOptions,
     LookAtMode,
     PrimitiveDefinition,
-    Vector3Like } from '../..';
+    SetAnimationStateOptions
+} from '../..';
 import BufferedEventEmitter from '../../utils/bufferedEventEmitter';
 import { createForwardPromise, ForwardPromise } from '../forwardPromise';
 import { InternalActor } from '../internal/actor';
@@ -367,56 +367,77 @@ export class Actor implements ActorLike {
     }
 
     /**
-     * Create an animation on this actor.
+     * Creates an animation on the actor.
+     * @param animationName The name of the animation.
      * @param options The animation keyframes, events, and other characteristics.
      */
-    public createAnimation(options: {
-        animationName: string,
-        keyframes: AnimationKeyframe[],
-        events: AnimationEvent[],
-        wrapMode?: AnimationWrapMode
-    }): Promise<void> {
-        return this.context.internal.createAnimation(this.id, options);
+    public createAnimation(animationName: string, options: CreateAnimationOptions): Promise<any> {
+        return this.context.internal.createAnimation(this.id, animationName, options);
     }
 
     /**
-     * Start playing an animation on this actor.
-     * @param animationName The name of the animation to start playing.
+     * Enables the animation on the actor. Animation will start playing immediately.
+     * @param animationName The name of the animation.
      */
-    public startAnimation(animationName: string, hasRootMotion?: boolean) {
-        this.context.internal.startAnimation(this.id, animationName, hasRootMotion);
+    public enableAnimation(animationName: string) {
+        this.setAnimationState(animationName, { enabled: true });
     }
 
     /**
-     * Stop playing an animation on this actor and reset the animation's state.
-     * @param animationName The name of the animation to stop playing.
+     * Disables the animation on the actor. Animation will stop playing immediately.
+     * When an animation is disabled, it is also paused (its time does not move forward).
+     * @param animationName The name of the animation.
      */
-    public stopAnimation(animationName: string) {
-        this.context.internal.stopAnimation(this.id, animationName);
+    public disableAnimation(animationName: string) {
+        this.setAnimationState(animationName, { enabled: false });
     }
 
     /**
-     * Resets the animation to its initial state.
-     * @param animationName The name of the animation to reset.
-     */
-    public resetAnimation(animationName: string) {
-        this.context.internal.resetAnimation(this.id, animationName);
-    }
-
-    /**
-     * Pauses the animation.
-     * @param animationName The name of the animation to pause.
-     */
-    public pauseAnimation(animationName: string) {
-        this.context.internal.pauseAnimation(this.id, animationName);
-    }
-
-    /**
-     * Resumes the animation.
-     * @param animationName The name of the animation to resume.
+     * Starts the animation (sets animation speed to 1).
+     * @param animationName The name of the animation.
      */
     public resumeAnimation(animationName: string) {
-        this.context.internal.resumeAnimation(this.id, animationName);
+        this.setAnimationState(animationName, { enabled: true });
+    }
+
+    /**
+     * Stops the animation (sets animation speed to zero).
+     * @param animationName The name of the animation.
+     */
+    public pauseAnimation(animationName: string) {
+        this.setAnimationState(animationName, { enabled: false });
+    }
+
+    /**
+     * Sets the animation time (units are in seconds).
+     * @param animationName The name of the animation.
+     * @param time The desired animation time. A negative value seeks to the end of the animation.
+     */
+    public setAnimationTime(animationName: string, time: number) {
+        this.setAnimationState(animationName, { time });
+    }
+
+    /**
+     * (Advanced) Sets the time, speed and wight of an animation.
+     * @param animationName The name of the animation.
+     * @param options The time, speed and enabled state to apply. All values are optional. Only the values
+     * provided will be applied.
+     */
+    public setAnimationState(animationName: string, state: SetAnimationStateOptions) {
+        return this.context.internal.setAnimationState(this.id, animationName, state);
+    }
+
+    /**
+     * Animate actor properties to the given value, following the specified animation curve. Actor transform
+     * is the only animatable property at the moment. Other properties such as light color may become animatable
+     * in the future.
+     * @param value The desired final state of the animation.
+     * @param duration The length of the interpolation (in seconds).
+     * @param curve The cubic-bezier curve parameters. @see AnimationEaseCurves for predefined values.
+     * @returns Returns a Promise that is resolves after the animation completes.
+     */
+    public animateTo(value: Partial<ActorLike>, duration: number, curve: number[]): Promise<void> {
+        return this.context.internal.interpolateActor(this.id, value, duration, curve);
     }
 
     /**
@@ -481,6 +502,25 @@ export class Actor implements ActorLike {
         return this;
     }
 
+    /**
+     * Set an event handler for the animation-disabled event.
+     * @param handler The handler to call when an animation reaches the end or is otherwise disabled.
+     */
+    public onAnimationDisabled(handler: (animationName: string) => any): this {
+        this.emitter.on('animation-disabled', handler);
+        return this;
+    }
+
+    /**
+     * Set an event handler for the animation-enabled event.
+     * @param handler The handler to call when an animation moves from the disabled to enabled state.
+     */
+    public onAnimationEnabled(handler: (animationName: string) => any): this {
+        this.emitter.on('animation-enabled', handler);
+        return this;
+    }
+
+    /** @hidden */
     public copyDirect(sactor: Partial<ActorLike>): this {
         // tslint:disable:curly
         if (!sactor) return this;
@@ -513,6 +553,7 @@ export class Actor implements ActorLike {
         // tslint:enable:curly
     }
 
+    /** @hidden */
     public toJSON() {
         return {
             id: this._id,

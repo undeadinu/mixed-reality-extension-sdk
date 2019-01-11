@@ -10,17 +10,22 @@ import {
     Actor,
     ActorLike,
     ActorSet,
-    AnimationEvent,
-    AnimationKeyframe,
     AnimationWrapMode,
     BehaviorType,
+    BoxColliderParams,
     Collider,
+    ColliderLike,
+    CollisionEvent,
+    CollisionLayer,
     Context,
+    CreateAnimationOptions,
     Light,
     LightLike,
     PrimitiveDefinition,
     RigidBody,
     RigidBodyLike,
+    SetAnimationStateOptions,
+    SphereColliderParams,
     SubscriptionOwnerType,
     SubscriptionType,
     Text,
@@ -46,17 +51,14 @@ import {
     EnableLight,
     EnableRigidBody,
     EnableText,
+    InterpolateActor,
     ObjectSpawned,
     OperationResult,
-    PauseAnimation,
     Payload,
-    ResetAnimation,
-    ResumeAnimation,
     RigidBodyCommands,
+    SetAnimationState,
     SetBehavior,
-    StartAnimation,
     StateUpdate,
-    StopAnimation,
     UpdateCollisionEventSubscriptions,
     UpdateSubscriptions,
 } from '../network/payloads';
@@ -67,7 +69,6 @@ import { Execution } from '../../protocols/execution';
 import { Handshake } from '../../protocols/handshake';
 import { createForwardPromise, ForwardPromise } from '../forwardPromise';
 import { OperatingModel } from '../network/operatingModel';
-import { BoxColliderParams, ColliderLike, CollisionEvent, CollisionLayer, SphereColliderParams } from '../runtime';
 
 /**
  * @hidden
@@ -108,6 +109,7 @@ export class InternalContext {
         this.performAction = this.performAction.bind(this);
         this.receiveRPC = this.receiveRPC.bind(this);
         this.collisionEventRaised = this.collisionEventRaised.bind(this);
+        this.setAnimationStateEventRaised = this.setAnimationStateEventRaised.bind(this);
 
         this.protocol.on('protocol.update-actors', this.updateActors);
         this.protocol.on('protocol.destroy-actors', this.localDestroyActors);
@@ -117,6 +119,7 @@ export class InternalContext {
         this.protocol.on('protocol.perform-action', this.performAction);
         this.protocol.on('protocol.receive-rpc', this.receiveRPC);
         this.protocol.on('protocol.collision-event-raised', this.collisionEventRaised);
+        this.protocol.on('protocol.set-animation-state', this.setAnimationStateEventRaised);
 
         // Startup the execution protocol
         this.protocol.startListening();
@@ -284,15 +287,7 @@ export class InternalContext {
         }));
     }
 
-    public createAnimation(
-        actorId: string,
-        options: {
-            animationName: string,
-            keyframes: AnimationKeyframe[],
-            events: AnimationEvent[],
-            wrapMode?: AnimationWrapMode
-        }
-    ): Promise<void> {
+    public createAnimation(actorId: string, animationName: string, options: CreateAnimationOptions): Promise<any> {
         const actor = this.actorSet[actorId];
         if (!actor) {
             return Promise.reject(`Failed to create animation. Actor ${actorId} not found`);
@@ -303,25 +298,26 @@ export class InternalContext {
         };
         // Enqueue a placeholder promise to indicate the operation is in progress.
         actor.internal.enqueueCreateAnimationPromise(
-            options.animationName, {
+            animationName, {
                 resolve: () => { /* empty */ },
                 reject: () => { /* empty */ },
             });
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<any>((resolve, reject) => {
             actor.created().then(() => {
                 // TODO: Reject promise if send() fails
                 this.protocol.sendPayload({
                     type: 'create-animation',
                     actorId,
+                    animationName,
                     ...options
                 } as CreateAnimation, {
                         resolve: (payload: ObjectSpawned) => {
                             this.protocol.recvPayload(payload);
-                            actor.internal.notifyAnimationCreated(options.animationName, true);
+                            actor.internal.notifyAnimationCreated(animationName, true);
                             resolve();
                         },
                         reject: (reason?: any) => {
-                            actor.internal.notifyAnimationCreated(options.animationName, false, reason);
+                            actor.internal.notifyAnimationCreated(animationName, false, reason);
                             reject(reason);
                         }
                     });
@@ -331,97 +327,52 @@ export class InternalContext {
         });
     }
 
-    public startAnimation(
+    public setAnimationState(
         actorId: string,
         animationName: string,
-        hasRootMotion?: boolean
-    ) {
-        const actor = this.actorSet[actorId];
-        if (actor) {
-            actor.internal.animationCreated(animationName)
-                .then(() => {
-                    this.protocol.sendPayload({
-                        type: 'start-animation',
-                        actorId,
-                        animationName,
-                        hasRootMotion
-                    } as StartAnimation);
-                })
-                .catch((reason) => log.error('app', reason));
-        } else {
-            log.error('app', `Failed to start animation ${animationName}. Actor ${actorId} not found`);
-        }
-    }
-
-    public stopAnimation(
-        actorId: string,
-        animationName: string
+        state: SetAnimationStateOptions
     ) {
         const actor = this.actorSet[actorId];
         if (actor) {
             actor.internal.animationCreated(animationName)
                 .then(() => this.protocol.sendPayload({
-                    type: 'stop-animation',
-                    actorId,
-                    animationName
-                } as StopAnimation))
-                .catch((reason) => log.error('app', reason));
-        } else {
-            log.error('app', `Failed to stop animation ${animationName}. Actor ${actorId} not found`);
-        }
-    }
-
-    public pauseAnimation(
-        actorId: string,
-        animationName: string
-    ) {
-        const actor = this.actorSet[actorId];
-        if (actor) {
-            actor.internal.animationCreated(animationName)
-                .then(() => this.protocol.sendPayload({
-                    type: 'pause-animation',
+                    type: 'set-animation-state',
                     actorId,
                     animationName,
-                } as PauseAnimation))
+                    state
+                } as SetAnimationState))
                 .catch((reason) => log.error('app', reason));
         } else {
-            log.error('app', `Failed to pause animation ${animationName}. Actor ${actorId} not found`);
+            log.error('app', `Failed to set animation state on ${animationName}. Actor ${actorId} not found`);
         }
     }
 
-    public resumeAnimation(
+    public interpolateActor(
         actorId: string,
-        animationName: string
-    ) {
+        value: Partial<ActorLike>,
+        duration: number,
+        curve: number[],
+    ): Promise<void> {
         const actor = this.actorSet[actorId];
-        if (actor) {
-            actor.internal.animationCreated(animationName)
-                .then(() => this.protocol.sendPayload({
-                    type: 'resume-animation',
-                    actorId,
-                    animationName
-                } as ResumeAnimation))
-                .catch((reason) => log.error('app', reason));
+        if (!actor) {
+            return Promise.reject(`Actor ${actorId} not found`);
+        } else if (!Array.isArray(curve) || curve.length !== 4) {
+            return Promise.reject('`curve` parameter must be an array of four numbers. \
+            Try passing one of the predefined curves from `AnimationEaseCurves`');
         } else {
-            log.error('app', `Failed to resume animation ${animationName}. Actor ${actorId} not found`);
-        }
-    }
-
-    public resetAnimation(
-        actorId: string,
-        animationName: string
-    ) {
-        const actor = this.actorSet[actorId];
-        if (actor) {
-            actor.internal.animationCreated(animationName)
-                .then(() => this.protocol.sendPayload({
-                    type: 'reset-animation',
-                    actorId,
-                    animationName
-                } as ResetAnimation))
-                .catch((reason) => log.error('app', reason));
-        } else {
-            log.error('app', `Failed to reset animation ${animationName}. Actor ${actorId} not found`);
+            return new Promise<void>((resolve, reject) => {
+                actor.created().then(() => {
+                    this.protocol.sendPayload({
+                        type: 'interpolate-actor',
+                        actorId,
+                        animationName: UUID(),
+                        value,
+                        duration,
+                        curve,
+                        enabled: true
+                    } as InterpolateActor, { resolve, reject });
+                });
+            });
         }
     }
 
@@ -792,6 +743,13 @@ export class InternalContext {
             actor.internal.collisionEventRaised(
                 collisionEvent.collisionEventType,
                 collisionEvent.collisionData);
+        }
+    }
+
+    public setAnimationStateEventRaised(actorId: string, animationName: string, state: SetAnimationStateOptions) {
+        const actor = this.context.actor(actorId);
+        if (actor) {
+            actor.internal.setAnimationStateEventRaised(animationName, state);
         }
     }
 
