@@ -289,7 +289,7 @@ export class InternalContext {
         }));
     }
 
-    public createAnimation(actorId: string, animationName: string, options: CreateAnimationOptions): Promise<any> {
+    public createAnimation(actorId: string, animationName: string, options: CreateAnimationOptions): Promise<void> {
         const actor = this.actorSet[actorId];
         if (!actor) {
             return Promise.reject(`Failed to create animation. Actor ${actorId} not found`);
@@ -304,7 +304,7 @@ export class InternalContext {
                 resolve: () => { /* empty */ },
                 reject: () => { /* empty */ },
             });
-        return new Promise<any>((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             actor.created().then(() => {
                 // TODO: Reject promise if send() fails
                 this.protocol.sendPayload({

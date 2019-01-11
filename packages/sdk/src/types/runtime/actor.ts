@@ -368,7 +368,7 @@ export class Actor implements ActorLike {
      * @param animationName The name of the animation.
      * @param options The animation keyframes, events, and other characteristics.
      */
-    public createAnimation(animationName: string, options: CreateAnimationOptions): Promise<any> {
+    public createAnimation(animationName: string, options: CreateAnimationOptions): Promise<void> {
         return this.context.internal.createAnimation(this.id, animationName, options);
     }
 
