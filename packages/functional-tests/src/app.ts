@@ -36,9 +36,9 @@ export default class App {
     /**
      * Registry of functional tests. Add your test here.
      */
-    private testFactories: { [key: string]: () => Test } = {
+    private testFactories: { [key: string]: (user: MRESDK.User) => Test } = {
         'gltf-animation-test': (): Test => new GltfAnimationTest(this, this.baseUrl),
-        'look-at-test': (): Test => new LookAtTest(this, this.baseUrl),
+        'look-at-test': (user: MRESDK.User): Test => new LookAtTest(this, this.baseUrl, user),
         'rigid-body-test': (): Test => new RigidBodyTest(this),
         'text-test': (): Test => new TextTest(this),
         'clock-sync-test': (): Test => new ClockSyncTest(this, this.baseUrl),
@@ -46,7 +46,8 @@ export default class App {
         'primitives-test': (): Test => new PrimitivesTest(this, this.baseUrl),
         'input-test': (): Test => new InputTest(this, this.baseUrl),
         'gltf-gen-test': (): Test => new GltfGenTest(this, this.baseUrl),
-        'asset-preload-test': (): Test => new AssetPreloadTest(this, this.baseUrl),
+        'user-test': (user: MRESDK.User): Test => new UserTest(this, this.baseUrl, user),
+        'asset-preload-test': (user: MRESDK.User): Test => new AssetPreloadTest(this, this.baseUrl, user),
         'interpolation-test': (): Test => new InterpolationTest(this),
     };
 
@@ -90,7 +91,7 @@ export default class App {
         } else if (!this.testFactories[testName]) {
             console.log(`error: Unrecognized test: '${testName}'`);
         } else {
-            const test = this.activeTests[testName] = this.testFactories[testName]();
+            const test = this.activeTests[testName] = this.testFactories[testName](user);
             this.rpc.send('functional-test:test-started', testName);
             console.log(`Test started: '${testName}'`);
             let success: boolean;

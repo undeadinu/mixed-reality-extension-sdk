@@ -11,7 +11,7 @@ import Test from './test';
 
 export default class LookAtTest extends Test {
 
-    constructor(app: App, private baseUrl: string) {
+    constructor(app: App, private baseUrl: string, private user: MRESDK.User) {
         super(app);
     }
 
@@ -72,20 +72,22 @@ export default class LookAtTest extends Test {
         tester.enableAnimation('circle');
 
         this.app.rpc.send('functional-test:trace-message', 'look-at-test', "LookAtMode.None");
-        tester.lookAt = MRESDK.LookAtMode.None;
+        tester.lookAt(null, MRESDK.LookAtMode.None);
         await delay(2000);
 
         this.app.rpc.send('functional-test:trace-message', 'look-at-test', "LookAtMode.LocalUserXY");
-        tester.lookAt = MRESDK.LookAtMode.LocalUserXY;
-        await delay(8000);
+        tester.lookAt(this.user, MRESDK.LookAtMode.TargetXY);
+        await delay(4000);
 
         this.app.rpc.send('functional-test:trace-message', 'look-at-test', "LookAtMode.LocalUserY");
-        tester.lookAt = MRESDK.LookAtMode.LocalUserY;
-        await delay(8000);
+        tester.lookAt(this.user, MRESDK.LookAtMode.TargetY);
+        await delay(4000);
+
+        this.app.rpc.send('functional-test:trace-message', 'look-at-test', "LookAtMode.None");
+        tester.lookAt(null, MRESDK.LookAtMode.None);
+        await delay(1000);
 
         tester.disableAnimation('circle');
-        await delay(2000);
-
         destroyActors(tester);
 
         return true;

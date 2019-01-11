@@ -21,6 +21,7 @@ import {
     CreateAnimationOptions,
     Light,
     LightLike,
+    LookAtMode,
     PrimitiveDefinition,
     RigidBody,
     RigidBodyLike,
@@ -52,6 +53,7 @@ import {
     EnableRigidBody,
     EnableText,
     InterpolateActor,
+    LookAt,
     ObjectSpawned,
     OperationResult,
     Payload,
@@ -347,7 +349,7 @@ export class InternalContext {
         }
     }
 
-    public interpolateActor(
+    public animateTo(
         actorId: string,
         value: Partial<ActorLike>,
         duration: number,
@@ -355,7 +357,7 @@ export class InternalContext {
     ): Promise<void> {
         const actor = this.actorSet[actorId];
         if (!actor) {
-            return Promise.reject(`Actor ${actorId} not found`);
+            return Promise.reject(`Failed animateTo. Actor ${actorId} not found`);
         } else if (!Array.isArray(curve) || curve.length !== 4) {
             return Promise.reject('`curve` parameter must be an array of four numbers. \
             Try passing one of the predefined curves from `AnimationEaseCurves`');
@@ -371,8 +373,28 @@ export class InternalContext {
                         curve,
                         enabled: true
                     } as InterpolateActor, { resolve, reject });
+                }).catch((reason: any) => {
+                    log.error('app', `Failed animateTo. Actor ${actor.id}. ${(reason || '').toString()}`.trim());
                 });
             });
+        }
+    }
+
+    public lookAt(actorId: string, targetId: string, lookAtMode: LookAtMode) {
+        const actor = this.actorSet[actorId];
+        if (actor) {
+            actor.created().then(() => {
+                this.protocol.sendPayload({
+                    type: 'look-at',
+                    actorId,
+                    targetId,
+                    lookAtMode
+                } as LookAt);
+            }).catch((reason: any) => {
+                log.error('app', `Failed lookAt. Actor ${actor.id}. ${(reason || '').toString()}`.trim());
+            });
+        } else {
+            log.error('app', `Failed lookAt. Actor ${actorId} not found`);
         }
     }
 

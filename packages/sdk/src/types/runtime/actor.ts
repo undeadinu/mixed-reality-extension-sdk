@@ -15,7 +15,8 @@ import {
     Text,
     TextLike,
     Transform,
-    TransformLike
+    TransformLike,
+    User
 } from '.';
 import {
     Context,
@@ -41,7 +42,6 @@ export interface ActorLike {
     parentId: string;
     name: string;
     tag: string;
-    lookAt: LookAtMode;
     subscriptions: SubscriptionType[];
     transform: Partial<TransformLike>;
     light: Partial<LightLike>;
@@ -79,7 +79,6 @@ export class Actor implements ActorLike {
     private _rigidBody?: RigidBody;
     private _collider?: Collider;
     private _text?: Text;
-    private _lookAt?: LookAtMode = LookAtMode.None;
     // tslint:enable:variable-name
 
     /**
@@ -97,8 +96,6 @@ export class Actor implements ActorLike {
     public get rigidBody() { return this._rigidBody; }
     public get collider() { return this._collider; }
     public get text() { return this._text; }
-    public get lookAt() { return this._lookAt; }
-    public set lookAt(value) { this._lookAt = value; this.actorChanged('lookAt'); }
     public get children() { return this.context.actors.filter(actor => actor.parentId === this.id); }
     public get parent() { return this._context.actor(this._parentId); }
     public get parentId() { return this._parentId; }
@@ -437,7 +434,24 @@ export class Actor implements ActorLike {
      * @returns Returns a Promise that is resolves after the animation completes.
      */
     public animateTo(value: Partial<ActorLike>, duration: number, curve: number[]): Promise<void> {
-        return this.context.internal.interpolateActor(this.id, value, duration, curve);
+        return this.context.internal.animateTo(this.id, value, duration, curve);
+    }
+
+    /**
+     * Instruct the actor to face another object, or stop facing an object.
+     * @param targetOrId The actor, user, or id of the object to face.
+     * @param lookAtMode How to face the target. @see LookUpMode.
+     */
+    public lookAt(targetOrId: Actor | User | string, lookAtMode: LookAtMode) {
+        let targetId: string;
+        if (lookAtMode !== LookAtMode.None) {
+            if (typeof (targetOrId) === 'object' && targetOrId.id !== undefined) {
+                targetId = targetOrId.id;
+            } else if (typeof (targetOrId) === 'string') {
+                targetId = targetOrId;
+            }
+        }
+        this.context.internal.lookAt(this.id, targetId, lookAtMode);
     }
 
     /**
@@ -529,7 +543,6 @@ export class Actor implements ActorLike {
         if (sactor.name) this._name = sactor.name;
         if (sactor.tag) this._tag = sactor.tag;
         if (sactor.transform) this._transform.copyDirect(sactor.transform);
-        if (sactor.lookAt) this._lookAt = sactor.lookAt;
         if (sactor.light) {
             if (!this._light)
                 this.enableLight(sactor.light);
@@ -560,7 +573,6 @@ export class Actor implements ActorLike {
             parentId: this._parentId,
             name: this._name,
             tag: this._tag,
-            lookAt: this._lookAt,
             transform: this._transform.toJSON(),
             light: this._light ? this._light.toJSON() : undefined,
             rigidBody: this._rigidBody ? this._rigidBody.toJSON() : undefined,

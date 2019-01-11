@@ -4,7 +4,7 @@
  */
 
 import { OperationResultCode, Trace } from '..';
-import { AnimationState, CreateAnimationOptions, SetAnimationStateOptions } from '../../..';
+import { AnimationState, CreateAnimationOptions, LookAtMode, SetAnimationStateOptions } from '../../..';
 import { PrimitiveDefinition } from '../../primitiveTypes';
 import { ActorLike, ColliderType, LightLike, TextLike, TransformLike, UserLike } from '../../runtime';
 import { ActionState, BehaviorType } from '../../runtime/behaviors';
@@ -65,6 +65,7 @@ export type PayloadType
     | 'update-background-behaviors'
     | 'load-assets'
     | 'assets-loaded'
+    | 'look-at'
     ;
 
 /**
@@ -404,4 +405,15 @@ export type InterpolateActor = Payload & {
     duration: number;
     curve: number[];
     enabled: boolean;
+};
+
+/**
+ * @hidden
+ * App to engine. Instruct the actor to face another actor or user.
+ */
+export type LookAt = Payload & {
+    type: 'look-at';
+    actorId: string;
+    targetId: string;
+    lookAtMode: LookAtMode;
 };
